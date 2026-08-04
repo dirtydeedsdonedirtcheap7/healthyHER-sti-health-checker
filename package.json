@@ -1,0 +1,8 @@
+{
+  "name": "ai-sti-symptom-checker",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ]
+}
