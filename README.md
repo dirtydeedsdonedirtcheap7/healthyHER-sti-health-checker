@@ -110,7 +110,7 @@ User
    ▼
 Hospital / Clinic
 ```
-
+![System Architecture](docs/clinical-architecture.png)
 ---
 
 # 🧠 Responsible AI Principles
