@@ -9,7 +9,12 @@ import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import ErrorOutlineOutlinedIcon from '@mui/icons-material/ErrorOutlineOutlined';
 
 const App = () => {
-  const { transcript, listening, browserSupportsSpeechRecognition } = useSpeechRecognition();
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition
+  } = useSpeechRecognition();
   const [isListening, setIsListening] = useState(false);
   const [symptoms, setSymptoms] = useState('');
   const [analysis, setAnalysis] = useState(null);
@@ -30,39 +35,44 @@ const App = () => {
   const stopListening = () => {
     SpeechRecognition.stopListening();
     setIsListening(false);
-    setSymptoms(transcript);
+  
+    const capturedTranscript = transcript.trim();
+  
+    setSymptoms(capturedTranscript);
     setConversationStage('analyzing');
-    analyzeSymptoms();
+  
+    analyzeSymptoms(capturedTranscript);
   };
 
-  const analyzeSymptoms = async () => {
-    if (!symptoms.trim()) {
+  const analyzeSymptoms = async (symptomsToAnalyze) => {
+    if (!symptomsToAnalyze.trim()) {
       setError('Please describe your symptoms first');
       setConversationStage('initial');
       return;
     }
-
+  
     setLoading(true);
     setError(null);
-
+  
     try {
-      // Call backend API for symptom analysis
       const response = await fetch('http://localhost:3001/api/analyze-symptoms', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ symptoms }),
+        body: JSON.stringify({
+          symptoms: symptomsToAnalyze
+        }),
       });
-
+  
       if (!response.ok) {
         throw new Error('Analysis failed');
       }
-
+  
       const result = await response.json();
+  
       setAnalysis(result);
-
-      // Generate follow-up questions based on initial analysis
+  
       if (result.followUpQuestions && result.followUpQuestions.length > 0) {
         setFollowUpQuestions(result.followUpQuestions);
         setCurrentQuestionIndex(0);
@@ -120,7 +130,7 @@ const App = () => {
   };
 
   const resetSession = () => {
-    SpeechRecognition.resetTranscript();
+    resetTranscript();
     setIsListening(false);
     setSymptoms('');
     setAnalysis(null);
