@@ -1,6 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-import { Box, TextField, Button, Typography, Avatar, CircularProgress, Paper } from '@mui/material';
+import {
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Avatar,
+  CircularProgress,
+  Paper,
+  IconButton
+} from '@mui/material';
 import MicOffOutlinedIcon from '@mui/icons-material/MicOffOutlined';
 import MicNoneOutlinedIcon from '@mui/icons-material/MicNoneOutlined';
 import MicOutlinedIcon from '@mui/icons-material/MicOutlined';
@@ -15,7 +24,8 @@ const App = () => {
     transcript,
     listening,
     resetTranscript,
-    browserSupportsSpeechRecognition
+    browserSupportsSpeechRecognition,
+    browserSupportsContinuousListening
   } = useSpeechRecognition();
   const [isListening, setIsListening] = useState(false);
   const [symptoms, setSymptoms] = useState('');
@@ -27,24 +37,75 @@ const App = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userResponses, setUserResponses] = useState({});
   const [currentAnswer, setCurrentAnswer] = useState('');
+  const [speechError, setSpeechError] = useState('');
+  const [inputMode, setInputMode] = useState('text');
   
-  const startListening = () => {
-    SpeechRecognition.startListening({ continuous: false, interimResults: true });
-    setIsListening(true);
-    setConversationStage('listening');
-    setError(null);
+  const startListening = async () => {
+    if (!browserSupportsSpeechRecognition) {
+      setSpeechError(
+        'Voice input is not available in this browser. You can type your symptoms instead.'
+      );
+      setInputMode('text');
+      return;
+    }
+  
+    try {
+      setSpeechError('');
+      setError(null);
+  
+      resetTranscript();
+  
+      setInputMode('voice');
+      setIsListening(true);
+      setConversationStage('listening');
+  
+      await SpeechRecognition.startListening({
+        continuous: false,
+        interimResults: true,
+        language: 'en-US'
+      });
+    } catch (err) {
+      console.error('Speech recognition failed:', err);
+  
+      setIsListening(false);
+      setInputMode('text');
+      setConversationStage('initial');
+  
+      setSpeechError(
+        'We could not start voice input. Please check your microphone permission or type your symptoms instead.'
+      );
+    }
   };
-
-  const stopListening = () => {
-    SpeechRecognition.stopListening();
+  const stopListening = async () => {
+    try {
+      await SpeechRecognition.stopListening();
+    } catch (err) {
+      console.error('Could not stop speech recognition:', err);
+    }
+  
     setIsListening(false);
+    setInputMode('text');
+    setConversationStage('initial');
   
     const capturedTranscript = transcript.trim();
   
-    setSymptoms(capturedTranscript);
+    if (capturedTranscript) {
+      setSymptoms(capturedTranscript);
+    }
+  };
+
+  const handleTextSubmit = async () => {
+    const text = symptoms.trim();
+  
+    if (!text) {
+      setError('Please describe what you are experiencing.');
+      return;
+    }
+  
+    setError(null);
     setConversationStage('analyzing');
   
-    analyzeSymptoms(capturedTranscript);
+    await analyzeSymptoms(text);
   };
 
   const analyzeSymptoms = async (symptomsToAnalyze) => {
@@ -204,18 +265,174 @@ const App = () => {
           <Typography color="error">Speech recognition not supported in this browser</Typography>
         ) : (
           <>
-            <Typography variant="h6" align="center" sx={{ mb: 2 }}>
-              {conversationStage === 'initial' ?
-                'Tap to describe your symptoms' :
-                conversationStage === 'listening' ?
-                  'Listening...' :
-                  conversationStage === 'analyzing' ?
-                    'Analyzing your symptoms...' :
-                    conversationStage === 'follow-up' ?
-                      `Question ${currentQuestionIndex + 1} of ${followUpQuestions.length}` :
-                      'Results ready'
-              }
-            </Typography>
+            <Box>
+              <Typography
+                variant="h5"
+                sx={{
+                  mb: 1,
+                  fontWeight: 700,
+                  color: 'text.primary',
+                  textAlign: 'center'
+                }}
+              >
+                What are you experiencing?
+              </Typography>
+            
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  mb: 3,
+                  textAlign: 'center',
+                  lineHeight: 1.6
+                }}
+              >
+                Describe your symptoms in your own words. You can type or use your voice.
+              </Typography>
+            
+              <TextField
+                fullWidth
+                multiline
+                minRows={5}
+                maxRows={10}
+                value={symptoms}
+                onChange={(e) => {
+                  setSymptoms(e.target.value);
+                  setError(null);
+                }}
+                placeholder="For example: I've noticed some unusual discharge and burning when I urinate..."
+                disabled={loading || isListening}
+                sx={{
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 3,
+                    backgroundColor: '#fff'
+                  }
+                }}
+              />
+            
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1.5,
+                  flexDirection: { xs: 'column', sm: 'row' }
+                }}
+              >
+                <Button
+                  fullWidth
+                  variant="contained"
+                  onClick={handleTextSubmit}
+                  disabled={!symptoms.trim() || loading || isListening}
+                  sx={{
+                    minHeight: 52,
+                    borderRadius: 3,
+                    textTransform: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  {loading ? (
+                    <CircularProgress size={22} color="inherit" />
+                  ) : (
+                    'Continue'
+                  )}
+                </Button>
+            
+                {browserSupportsSpeechRecognition && (
+                  <Button
+                    fullWidth
+                    variant={isListening ? 'contained' : 'outlined'}
+                    color={isListening ? 'error' : 'primary'}
+                    onClick={isListening ? stopListening : startListening}
+                    disabled={loading}
+                    sx={{
+                      minHeight: 52,
+                      borderRadius: 3,
+                      textTransform: 'none',
+                      fontWeight: 600
+                    }}
+                  >
+                    {isListening ? (
+                      <>
+                        <MicNoneOutlinedIcon sx={{ mr: 1 }} />
+                        Stop listening
+                      </>
+                    ) : (
+                      <>
+                        <MicOutlinedIcon sx={{ mr: 1 }} />
+                        Speak instead
+                      </>
+                    )}
+                  </Button>
+                )}
+              </Box>
+            
+              {isListening && (
+                <Box
+                  sx={{
+                    mt: 2,
+                    p: 2,
+                    borderRadius: 3,
+                    backgroundColor: '#f1f8f6',
+                    border: '1px solid #d5ebe4'
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      textAlign: 'center'
+                    }}
+                  >
+                    Listening… speak naturally.
+                  </Typography>
+            
+                  {transcript && (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        mt: 1,
+                        color: 'text.secondary',
+                        textAlign: 'center',
+                        fontStyle: 'italic'
+                      }}
+                    >
+                      “{transcript}”
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            
+              {speechError && (
+                <Box
+                  sx={{
+                    mt: 2,
+                    p: 2,
+                    borderRadius: 3,
+                    backgroundColor: '#fff8e6'
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    {speechError}
+                  </Typography>
+                </Box>
+              )}
+            
+              {!browserSupportsSpeechRecognition && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    display: 'block',
+                    mt: 2,
+                    textAlign: 'center'
+                  }}
+                >
+                  Voice input isn't available in this browser. You can still use the
+                  text box above.
+                </Typography>
+              )}
+            </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
               {!isListening && conversationStage !== 'listening' ? (
@@ -271,17 +488,18 @@ const App = () => {
                       Previous
                     </Button>
                   )}
-                  {currentQuestionIndex < followUpQuestions.length - 1 && (
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      size="small"
-                      onClick={handleFollowUpAnswer}
-                      disabled={loading}
-                    >
-                      Next
-                    </Button>
-                  )}
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                    disabled={!currentAnswer.trim()}
+                    onClick={() => {
+                      handleFollowUpAnswer(currentAnswer);
+                      setCurrentAnswer('');
+                    }}
+                  >
+                    Next
+                  </Button>
                  {currentQuestionIndex === followUpQuestions.length - 1 && (
                     <Button
                       variant="contained"
