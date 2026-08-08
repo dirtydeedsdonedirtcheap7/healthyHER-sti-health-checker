@@ -2,6 +2,16 @@ const express = require("express");
 const dotenv = require("dotenv");
 const axios = require("axios");
 
+const {
+  createConversationState,
+  addSymptom,
+  recordAnswer,
+  getNextQuestion,
+  getConversationSummary,
+  getMissingInformation,
+  isReadyForAssessment
+} = require("./src/assessment/conversationEngine");
+
 dotenv.config();
 
 const app = express();
@@ -182,6 +192,105 @@ const stiKnowledgeBase = {
 app.get("/", (req, res) => {
   res.send("VoxCare AI-STI Symptom Checker API");
 });
+
+```js
+// Start a new conversation
+app.post("/api/conversation/start", (req, res) => {
+  try {
+    const {
+      symptoms = "",
+      language = "en",
+      goal = "symptoms"
+    } = req.body;
+
+    const state = createConversationState({
+      language,
+      goal
+    });
+
+    if (symptoms.trim()) {
+      addSymptom(state, symptoms);
+    }
+
+    const nextQuestion = getNextQuestion(state);
+
+    res.json({
+      success: true,
+      conversation: state,
+      nextQuestion,
+      readyForAssessment: isReadyForAssessment(state)
+    });
+  } catch (error) {
+    console.error("Error starting conversation:", error);
+
+    res.status(500).json({
+      error: "Unable to start assessment"
+    });
+  }
+});
+
+
+// Continue an existing conversation
+app.post("/api/conversation/respond", (req, res) => {
+  try {
+    const {
+      conversation,
+      field,
+      answer
+    } = req.body;
+
+    if (!conversation) {
+      return res.status(400).json({
+        error: "Conversation state is required"
+      });
+    }
+
+    if (!field) {
+      return res.status(400).json({
+        error: "Question field is required"
+      });
+    }
+
+    if (answer === undefined || answer === null) {
+      return res.status(400).json({
+        error: "Answer is required"
+      });
+    }
+
+    const state = {
+      ...conversation,
+      symptoms: Array.isArray(conversation.symptoms)
+        ? conversation.symptoms
+        : [],
+      answeredQuestions: Array.isArray(conversation.answeredQuestions)
+        ? conversation.answeredQuestions
+        : [],
+      safetyFlags: Array.isArray(conversation.safetyFlags)
+        ? conversation.safetyFlags
+        : []
+    };
+
+    recordAnswer(state, field, answer);
+
+    const nextQuestion = getNextQuestion(state);
+
+    res.json({
+      success: true,
+      conversation: state,
+      nextQuestion,
+      readyForAssessment: isReadyForAssessment(state),
+      missingInformation: getMissingInformation(state),
+      summary: getConversationSummary(state)
+    });
+  } catch (error) {
+    console.error("Error processing conversation response:", error);
+
+    res.status(500).json({
+      error: "Unable to process response"
+    });
+  }
+});
+```
 
 // Symptom analysis endpoint
 app.post("/api/analyze-symptoms", async (req, res) => {
