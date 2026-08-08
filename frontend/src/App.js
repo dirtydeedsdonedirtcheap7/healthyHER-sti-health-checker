@@ -26,7 +26,8 @@ const App = () => {
   const [followUpQuestions, setFollowUpQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userResponses, setUserResponses] = useState({});
-
+  const [currentAnswer, setCurrentAnswer] = useState('');
+  
   const startListening = () => {
     SpeechRecognition.startListening({ continuous: false, interimResults: true });
     setIsListening(true);
@@ -90,44 +91,58 @@ const App = () => {
     }
   };
 
-  const handleFollowUpAnswer = async (answer) => {
-    setUserResponses(prev => ({
-      ...prev,
+  const handleFollowUpAnswer = async () => {
+    const answer = currentAnswer.trim();
+  
+    if (!answer) {
+      setError('Please enter an answer before continuing.');
+      return;
+    }
+  
+    setError(null);
+  
+    const updatedResponses = {
+      ...userResponses,
       [followUpQuestions[currentQuestionIndex]]: answer
-    }));
-
+    };
+  
+    setUserResponses(updatedResponses);
+    setCurrentAnswer('');
+  
     if (currentQuestionIndex < followUpQuestions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
-    } else {
-      // All follow-up questions answered, get final analysis
-      setConversationStage('analyzing');
-      setLoading(true);
-
-      try {
-        const response = await fetch(`${API_URL}/api/final-analysis`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            symptoms,
-            responses: userResponses
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Final analysis failed');
-        }
-
-        const result = await response.json();
-        setAnalysis(result);
-        setConversationStage('results');
-      } catch (err) {
-        setError('Failed to complete analysis. Please try again.');
-        console.error(err);
-      } finally {
-        setLoading(false);
+      return;
+    }
+  
+    // All follow-up questions answered
+    setConversationStage('analyzing');
+    setLoading(true);
+  
+    try {
+      const response = await fetch(`${API_URL}/api/final-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symptoms,
+          responses: updatedResponses
+        }),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Final analysis failed');
       }
+  
+      const result = await response.json();
+  
+      setAnalysis(result);
+      setConversationStage('results');
+    } catch (err) {
+      setError('Failed to complete analysis. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -141,6 +156,7 @@ const App = () => {
     setConversationStage('initial');
     setFollowUpQuestions([]);
     setCurrentQuestionIndex(0);
+    setCurrentAnswer('');
     setUserResponses({});
   };
 
@@ -242,7 +258,11 @@ const App = () => {
                   label="Your response"
                   variant="outlined"
                   fullWidth
-                  onChange={(e) => handleFollowUpAnswer(e.target.value)}
+                  multiline
+                  minRows={3}
+                  value={currentAnswer}
+                  onChange={(e) => setCurrentAnswer(e.target.value)}
+                  placeholder="Tell us what you've noticed..."
                   sx={{ mb: 2 }}
                 />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -252,13 +272,25 @@ const App = () => {
                     </Button>
                   )}
                   {currentQuestionIndex < followUpQuestions.length - 1 && (
-                    <Button variant="contained" color="primary" size="small" onClick={() => setCurrentQuestionIndex(prev => prev + 1)}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      onClick={handleFollowUpAnswer}
+                      disabled={loading}
+                    >
                       Next
                     </Button>
                   )}
-                  {currentQuestionIndex === followUpQuestions.length - 1 && (
-                    <Button variant="contained" color="primary" size="small" onClick={() => handleFollowUpAnswer('')}>
-                      Finish
+                 {currentQuestionIndex === followUpQuestions.length - 1 && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      onClick={handleFollowUpAnswer}
+                      disabled={loading}
+                    >
+                      {loading ? 'Analyzing...' : 'Finish'}
                     </Button>
                   )}
                 </Box>
@@ -305,8 +337,7 @@ const App = () => {
 
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-                    �� ⚠��️ This tool provides health information only and does not constitute medical advice.
-                    Please consult with a healthcare professional for proper diagnosis and treatment.
+                    ⚠️ This tool provides health information only and does not constitute medical advice. Please consult a healthcare professional for diagnosis and treatment.
                   </Typography>
                 </Box>
               </Box>
@@ -333,7 +364,7 @@ const App = () => {
           New Assessment
         </Button>
         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-          VoxCare • Powered by Responsible AI • Privacy First
+          Powered by Responsible AI • Privacy First
         </Typography>
       </Box>
     </Box>
