@@ -7,6 +7,7 @@ import MicOutlinedIcon from '@mui/icons-material/MicOutlined';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import ErrorOutlineOutlinedIcon from '@mui/icons-material/ErrorOutlineOutlined';
+import './App.css';
 
 const App = () => {
   const {
@@ -159,12 +160,23 @@ const App = () => {
   }
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', pt: 4 }}>
+    <Box
+      className="app-shell"
+      sx={{
+        maxWidth: 600,
+        mx: 'auto',
+        pt: 4,
+      }}
+    >
       <Avatar sx={{ bgcolor: 'primary.main', color: 'white', width: 100, height: 100 }}>
         <MicNoneOutlinedIcon fontSize="large" />
       </Avatar>
-      <Typography variant="h4" align="center" sx={{ my: 2 }}>
-        VoxCare: STI Symptom Checker
+      <Typography variant="h4" align="center">
+        healthyHER
+      </Typography>
+      
+      <Typography variant="body2" align="center">
+        A private, supportive space to understand your symptoms
       </Typography>
       <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 4 }}>
         Describe your symptoms naturally - we'll guide you to appropriate care
