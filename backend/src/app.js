@@ -12,6 +12,11 @@ const {
   isReadyForAssessment
 } = require("./src/assessment/conversationEngine");
 
+const {
+  evaluateSafety,
+  shouldStopConversation
+} = require("./src/assessment/safetyRules");
+
 dotenv.config();
 
 const app = express();
@@ -212,6 +217,18 @@ app.post("/api/conversation/start", (req, res) => {
       addSymptom(state, symptoms);
     }
 
+    const safety = evaluateSafety(state);
+
+    if (safety.shouldStopAssessment) {
+      return res.json({
+        success: true,
+        conversation: state,
+        nextQuestion: null,
+        readyForAssessment: false,
+        safety
+      });
+    }
+
     const nextQuestion = getNextQuestion(state);
 
     res.json({
@@ -271,6 +288,19 @@ app.post("/api/conversation/respond", (req, res) => {
     };
 
     recordAnswer(state, field, answer);
+
+    const safety = evaluateSafety(state);
+
+    if (safety.shouldStopAssessment) {
+      return res.json({
+        success: true,
+        conversation: state,
+        nextQuestion: null,
+        readyForAssessment: false,
+        safety,
+        summary: getConversationSummary(state)
+      });
+    }
 
     const nextQuestion = getNextQuestion(state);
 
