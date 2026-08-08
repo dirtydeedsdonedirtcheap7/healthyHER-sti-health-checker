@@ -8,6 +8,7 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import ErrorOutlineOutlinedIcon from '@mui/icons-material/ErrorOutlineOutlined';
 import './App.css';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const App = () => {
   const {
@@ -56,7 +57,7 @@ const App = () => {
     setError(null);
   
     try {
-      const response = await fetch('http://localhost:3001/api/analyze-symptoms', {
+      const response = await fetch(`${API_URL}/api/analyze-symptoms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,7 +104,7 @@ const App = () => {
       setLoading(true);
 
       try {
-        const response = await fetch('http://localhost:3001/api/final-analysis', {
+        const response = await fetch(`${API_URL}/api/final-analysis`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
